@@ -18,6 +18,12 @@ err_num     db 'Abu skaiciai turi buti naturalus skaiciai > 0 $'
 row1 dw ?
 row2 dw ?
 
+rowStarts   dw 100 dup(0)
+rowEnds  dw 100 dup(0)
+
+sourceF   	db 12 dup (0) 
+sourceFHandle	dw ? 
+
 .code
 
 START:
@@ -52,6 +58,16 @@ START:
 
     mov ax, row2
     call print_number
+
+    call skip_spaces
+    lea	di, sourceF            
+	call read_filename
+    
+    mov	ax, @data          
+	mov	ds, ax               
+	mov	dx, offset sourceF       
+	mov	ah, 09h              
+	int	21h  
 
     JMP _end
 
@@ -151,5 +167,23 @@ print_loop:
     pop ax
     ret
 print_number ENDP
+
+read_filename PROC near        
+	push ax                               
+read_filename_start:
+	cmp byte ptr ds:[si], 13   
+	je read_filename_end       
+	cmp byte ptr ds:[si], ' '  
+	jne read_filename_next    
+read_filename_end:
+	mov al, '$'                
+	stosb                      
+	pop ax                     
+	ret                       
+read_filename_next:
+	lodsb                      
+	stosb                      
+	jmp read_filename_start    
+read_filename ENDP
 
 end START
