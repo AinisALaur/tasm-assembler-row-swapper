@@ -12,14 +12,22 @@ JUMPS
 .data
 apie    	db 'Programa sukeicia pasirinktas eilutes vietomis',13,10,9,'2_uzd.exe [/?] row 1 row 2 [ - | sourceFile1 [sourceFile2] [...] ]',13,10,13,10,9,'/? - pagalba',13,10,'$'
 err_num     db 'Abu skaiciai turi buti naturalus skaiciai > 0 $'
-; err_s    	db 'Source failo nepavyko atidaryti skaitymui',13,10,'$'
+err_s    	db 'Source failo nepavyko atidaryti skaitymui',13,10,'$'
 ; err_bounds  db 'Tokia eilute faile neegzistuoja $'
+startRow    db 'Row start',13,10,'$'
+endRow      db 'Row end',13,10,'$'
+new_line    db 13,10,'$'
 
 row1 dw ?
 row2 dw ?
 
+buffer  	db 20 dup (?)
+
 rowStarts   dw 100 dup(0)
 rowEnds  dw 100 dup(0)
+currentPos dw 0
+currentRow dw 0
+rowStartPos dw 0
 
 sourceF   	db 12 dup (0) 
 sourceFHandle	dw ? 
@@ -53,23 +61,106 @@ START:
     jbe row_err
     mov row2, ax
 
-    mov ax, row1
-    call print_number
+    ; mov ax, row1
+    ; call print_number
 
-    mov ax, row2
-    call print_number
+    ; mov ax, row2
+    ; call print_number
 
     call skip_spaces
     lea	di, sourceF            
 	call read_filename
     
+    ; mov	ax, @data          
+	; mov	ds, ax               
+	; mov	dx, offset sourceF       
+	; mov	ah, 09h              
+	; int	21h  
+
+    jmp readSourceFile
+
+readSourceFile:
+	mov	ax, @data
+	mov	ds, ax
+	
+	cmp	byte ptr ds:[sourceF], '$'
+	jne	startConverting
+	jmp	_end
+
+startConverting:
+    mov dx, offset sourceF
+    mov ah, 3dh
+    mov al, 2
+    int 21h
+    jc err_source
+    mov sourceFHandle, ax
+
+    mov currentPos, 0
+    mov currentRow, 0
+    mov rowStartPos, 0
+
+read_loop:
+    mov bx, sourceFHandle
+    mov dx, offset buffer
+    mov cx, 1
+    mov ah, 3fh
+    int 21h
+    jc err_source
+    
+    cmp ax, 0
+    je close_file
+
+    mov dl, byte ptr [buffer]
+    cmp dl, 13
+    je handle_row_end
+
+    inc currentPos
+
+    jmp read_loop
+
+close_file:
+    mov bx, currentRow 
+    shl bx, 1
+
+    mov ax, rowStartPos
+    mov rowStarts[bx], ax
+
+    mov ax, currentPos
+    mov rowEnds[bx], ax
+
+    call print_data
+
+    mov ah, 3Eh
+    mov bx, sourceFHandle
+    int 21h
+    jmp _end
+
+handle_row_end:
+    mov bx, currentRow 
+    shl bx, 1
+    
+    mov ax, rowStartPos
+    mov rowStarts[bx], ax
+
+    mov ax, currentPos
+    mov rowEnds[bx], ax
+
+    inc currentRow
+    mov ax, currentPos
+    add ax, 1
+    mov rowStartPos, ax
+
+    call print_data
+
+    jmp read_loop
+
+err_source:
     mov	ax, @data          
 	mov	ds, ax               
-	mov	dx, offset sourceF       
+	mov	dx, offset err_s       
 	mov	ah, 09h              
-	int	21h  
-
-    JMP _end
+	int	21h                   
+	jmp _end 
 
 row_err:
     mov	ax, @data          
@@ -185,5 +276,39 @@ read_filename_next:
 	stosb                      
 	jmp read_filename_start    
 read_filename ENDP
+
+print_data PROC near
+    mov	ax, @data          
+	mov	ds, ax               
+	mov	dx, offset startRow       
+	mov	ah, 09h              
+	int	21h  
+
+    mov ax, rowStarts[bx]
+    call print_number
+
+    mov	ax, @data          
+	mov	ds, ax               
+	mov	dx, offset new_line       
+	mov	ah, 09h              
+	int	21h  
+
+    mov	ax, @data          
+	mov	ds, ax               
+	mov	dx, offset endRow       
+	mov	ah, 09h              
+	int	21h  
+
+    mov ax, rowEnds[bx]
+    call print_number
+
+    mov	ax, @data          
+	mov	ds, ax               
+	mov	dx, offset new_line       
+	mov	ah, 09h              
+	int	21h  
+
+    ret
+print_data ENDP
 
 end START
