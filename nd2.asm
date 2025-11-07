@@ -10,6 +10,9 @@
 JUMPS
 
 .data
+row1 dw ?
+row2 dw ?
+
 apie    	db 'Programa sukeicia pasirinktas eilutes vietomis',13,10,9,'2_uzd.exe [/?] row 1 row 2 [ - | sourceFile1 [sourceFile2] [...] ]',13,10,13,10,9,'/? - pagalba',13,10,'$'
 err_num     db 'Abu skaiciai turi buti naturalus skaiciai > 0 $'
 err_s    	db 'Source failo nepavyko atidaryti skaitymui',13,10,'$'
@@ -17,11 +20,7 @@ err_s    	db 'Source failo nepavyko atidaryti skaitymui',13,10,'$'
 startRow    db 'Row start',13,10,'$'
 endRow      db 'Row end',13,10,'$'
 new_line    db 13,10,13,10,'$'
-
 err_fileName db 'Source failo vardas per ilgas', 13, 10, '$'
-
-row1 dw ?
-row2 dw ?
 
 buffer  	db 1 dup (?)
 
@@ -55,27 +54,21 @@ START:
     call read_number
     cmp ax, 0
     jbe row_err
-    mov row1, ax
+    mov es:row1, ax
 
     call skip_spaces
     call read_number
     cmp ax, 0
     jbe row_err
-    mov row2, ax
-
-    ; mov ax, row1
-    ; call print_number
-
-    ; mov ax, row2
-    ; call print_number
+    mov es:row2, ax 
 
 	lea	di, sourceF
 	call	read_filename
 
 	push	ds si
 
-	mov	ax, @data
-	mov	ds, ax
+    mov ax, @data
+    mov ds, ax
 
 	jmp	startConverting
 
@@ -107,7 +100,6 @@ startConverting:
 	; mov	dx, offset new_line       
 	; mov	ah, 09h              
 	; int	21h    
-
 
 	cmp	byte ptr ds:[sourceF], '$'
 	jne	source_from_file
@@ -161,6 +153,7 @@ close_file:
     mov rowEnds[bx], ax
 
     ; call print_data
+    call write_row_data
 
 	jmp	readSourceFile	
 
@@ -354,5 +347,34 @@ print_data PROC near
 
     ret
 print_data ENDP
+
+write_row_data PROC near
+    mov bx, row1
+    dec bx              ; convert to 0-based index
+    shl bx, 1
+    mov ax, rowStarts[bx]
+    call print_number
+
+    mov bx, row2
+    dec bx              ; convert to 0-based index
+    shl bx, 1
+    mov ax, rowStarts[bx]
+    call print_number
+
+    ; mov dx, rowStarts[bx]   ; use the value, not offset
+    ; mov cx, 0              ; high word of file offset
+    ; mov ah, 42h
+    ; mov al, 0              ; from beginning of file
+    ; mov bx, sourceFHandle
+    ; int 21h
+
+    ; mov  ah, 40h
+    ; mov  bx, sourceFHandle
+    ; mov  cx, 2
+    ; mov  dx, offset data_to_write
+    ; int  21h
+
+    ret
+write_row_data ENDP
 
 end START
