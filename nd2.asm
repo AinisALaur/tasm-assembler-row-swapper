@@ -16,12 +16,12 @@ err_s    	db 'Source failo nepavyko atidaryti skaitymui',13,10,'$'
 ; err_bounds  db 'Tokia eilute faile neegzistuoja $'
 startRow    db 'Row start',13,10,'$'
 endRow      db 'Row end',13,10,'$'
-new_line    db 13,10,'$'
+new_line    db 13,10,13,10,'$'
 
 row1 dw ?
 row2 dw ?
 
-buffer  	db 20 dup (?)
+buffer  	db 1 dup (?)
 
 rowStarts   dw 100 dup(0)
 rowEnds  dw 100 dup(0)
@@ -67,58 +67,88 @@ START:
     ; mov ax, row2
     ; call print_number
 
-    call skip_spaces
-    lea	di, sourceF            
-	call read_filename
-    
-    ; mov	ax, @data          
-	; mov	ds, ax               
-	; mov	dx, offset sourceF       
-	; mov	ah, 09h              
-	; int	21h  
+	lea	di, sourceF
+	call	read_filename
 
-    jmp readSourceFile
+	push	ds si
+
+	mov	ax, @data
+	mov	ds, ax
+
+	jmp	startConverting
 
 readSourceFile:
+	pop	si ds
+	lea	di, sourceF
+	call	read_filename
+
+	push	ds si
+
 	mov	ax, @data
 	mov	ds, ax
 	
 	cmp	byte ptr ds:[sourceF], '$'
 	jne	startConverting
 	jmp	_end
-
+	
 startConverting:
-    mov dx, offset sourceF
-    mov ah, 3dh
-    mov al, 2
-    int 21h
-    jc err_source
-    mov sourceFHandle, ax
+    ;; read file names
 
+	; mov	ax, @data          
+	; mov	ds, ax               
+	; mov	dx, offset sourceF       
+	; mov	ah, 09h              
+	; int	21h  
+	
+    ; mov	ax, @data          
+	; mov	ds, ax               
+	; mov	dx, offset new_line       
+	; mov	ah, 09h              
+	; int	21h    
+
+
+	cmp	byte ptr ds:[sourceF], '$'
+	jne	source_from_file
+	
+	mov	sourceFHandle, 0
+	jmp	read_loop
+	
+source_from_file:
     mov currentPos, 0
     mov currentRow, 0
     mov rowStartPos, 0
 
+	mov	dx, offset sourceF
+	mov	ah, 3dh            
+	mov	al, 0             
+	int	21h		
+	jc	err_source	
+	mov	sourceFHandle, ax	
+  
 read_loop:
-    mov bx, sourceFHandle
-    mov dx, offset buffer
-    mov cx, 1
-    mov ah, 3fh
-    int 21h
-    jc err_source
-    
-    cmp ax, 0
-    je close_file
+	mov	bx, sourceFHandle
+	mov	dx, offset buffer      
+	mov	cx, 1  
+	mov	ah, 3fh         
+	int	21h	 
 
+	cmp	ax, 0         
+	je	close_file         
+
+    ; print the character
     mov dl, byte ptr [buffer]
     cmp dl, 13
     je handle_row_end
 
     inc currentPos
 
-    jmp read_loop
+	jmp	read_loop	   
 
 close_file:
+	mov	bx, sourceFHandle	
+	mov	ah, 3eh	
+	int	21h
+
     mov bx, currentRow 
     shl bx, 1
 
@@ -128,12 +158,9 @@ close_file:
     mov ax, currentPos
     mov rowEnds[bx], ax
 
-    call print_data
+    ; call print_data
 
-    mov ah, 3Eh
-    mov bx, sourceFHandle
-    int 21h
-    jmp _end
+	jmp	readSourceFile	
 
 handle_row_end:
     mov bx, currentRow 
@@ -150,7 +177,7 @@ handle_row_end:
     add ax, 1
     mov rowStartPos, ax
 
-    call print_data
+    ; call print_data
 
     jmp read_loop
 
@@ -259,22 +286,24 @@ print_loop:
     ret
 print_number ENDP
 
-read_filename PROC near        
-	push ax                               
+read_filename PROC near
+	push	ax
+	call	skip_spaces
 read_filename_start:
-	cmp byte ptr ds:[si], 13   
-	je read_filename_end       
-	cmp byte ptr ds:[si], ' '  
-	jne read_filename_next    
+	cmp	byte ptr ds:[si], 13
+	je	read_filename_end
+	cmp	byte ptr ds:[si], ' '
+	jne	read_filename_next
 read_filename_end:
-	mov al, '$'                
-	stosb                      
-	pop ax                     
-	ret                       
+	mov	al, '$'	
+	stosb
+	pop	ax
+	ret
 read_filename_next:
-	lodsb                      
-	stosb                      
-	jmp read_filename_start    
+	lodsb	
+	stosb
+	jmp read_filename_start
+
 read_filename ENDP
 
 print_data PROC near
