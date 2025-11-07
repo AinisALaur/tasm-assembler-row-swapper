@@ -16,7 +16,7 @@ row2 dw ?
 apie    	db 'Programa sukeicia pasirinktas eilutes vietomis',13,10,9,'2_uzd.exe [/?] row 1 row 2 [ - | sourceFile1 [sourceFile2] [...] ]',13,10,13,10,9,'/? - pagalba',13,10,'$'
 err_num     db 'Abu skaiciai turi buti naturalus skaiciai > 0 $'
 err_s    	db 'Source failo nepavyko atidaryti skaitymui',13,10,'$'
-; err_bounds  db 'Tokia eilute faile neegzistuoja $'
+err_bounds  db 'Tokia eilute faile neegzistuoja $'
 startRow    db 'Row start',13,10,'$'
 endRow      db 'Row end',13,10,'$'
 new_line    db 13,10,13,10,'$'
@@ -29,6 +29,9 @@ rowEnds  dw 100 dup(0)
 currentPos dw 0
 currentRow dw 0
 rowStartPos dw 0
+
+row1Buffer db 256 dup(0)
+row2Buffer db 256 dup(0)
 
 sourceF   	db 12 dup (0) 
 sourceFHandle	dw ? 
@@ -139,10 +142,6 @@ read_loop:
 	jmp	read_loop	   
 
 close_file:
-	mov	bx, sourceFHandle	
-	mov	ah, 3eh	
-	int	21h
-
     mov bx, currentRow 
     shl bx, 1
 
@@ -154,6 +153,10 @@ close_file:
 
     ; call print_data
     call write_row_data
+
+    mov	bx, sourceFHandle	
+	mov	ah, 3eh	
+	int	21h
 
 	jmp	readSourceFile	
 
@@ -208,6 +211,18 @@ file_name_too_long:
 	mov	ax, @data          
 	mov	ds, ax               
 	mov	dx, offset err_fileName       
+	mov	ah, 09h              
+	int	21h                   
+	jmp _end  
+
+err_out_bounds:
+    mov	bx, sourceFHandle	
+	mov	ah, 3eh	
+	int	21h
+
+    mov	ax, @data          
+	mov	ds, ax               
+	mov	dx, offset err_bounds       
 	mov	ah, 09h              
 	int	21h                   
 	jmp _end  
@@ -349,17 +364,37 @@ print_data PROC near
 print_data ENDP
 
 write_row_data PROC near
-    mov bx, row1
-    dec bx              ; convert to 0-based index
-    shl bx, 1
-    mov ax, rowStarts[bx]
-    call print_number
-
+    ;if equal no swapping
+    mov ax, row1
     mov bx, row2
-    dec bx              ; convert to 0-based index
-    shl bx, 1
-    mov ax, rowStarts[bx]
-    call print_number
+
+    cmp ax, 0
+    jbe err_out_bounds
+
+    cmp bx, 0
+    jbe err_out_bounds
+
+    cmp ax, currentRow
+    ja err_out_bounds
+
+    cmp bx, currentRow
+    ja err_out_bounds
+
+    cmp ax, bx
+    je swap_end
+
+    ; get starting coordinates of rows to swap
+    ; mov bx, row1
+    ; dec bx 
+    ; shl bx, 1
+    ; mov ax, rowStarts[bx]
+    ; call print_number
+
+    ; mov bx, row2
+    ; dec bx 
+    ; shl bx, 1
+    ; mov ax, rowStarts[bx]
+    ; call print_number
 
     ; mov dx, rowStarts[bx]   ; use the value, not offset
     ; mov cx, 0              ; high word of file offset
@@ -374,7 +409,8 @@ write_row_data PROC near
     ; mov  dx, offset data_to_write
     ; int  21h
 
-    ret
+    swap_end:                 
+        ret
 write_row_data ENDP
 
 end START
