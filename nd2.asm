@@ -18,6 +18,8 @@ startRow    db 'Row start',13,10,'$'
 endRow      db 'Row end',13,10,'$'
 new_line    db 13,10,13,10,'$'
 
+err_fileName db 'Source failo vardas per ilgas', 13, 10, '$'
+
 row1 dw ?
 row2 dw ?
 
@@ -209,6 +211,14 @@ _end:
 	mov	ax, 4c00h             
 	int	21h
 
+file_name_too_long:
+	mov	ax, @data          
+	mov	ds, ax               
+	mov	dx, offset err_fileName       
+	mov	ah, 09h              
+	int	21h                   
+	jmp _end  
+
 ; PROCEDURES
 skip_spaces PROC near
 skip_spaces_loop:
@@ -289,19 +299,24 @@ print_number ENDP
 read_filename PROC near
 	push	ax
 	call	skip_spaces
+    xor cx, cx
 read_filename_start:
 	cmp	byte ptr ds:[si], 13
 	je	read_filename_end
 	cmp	byte ptr ds:[si], ' '
 	jne	read_filename_next
 read_filename_end:
-	mov	al, '$'	
+    cmp cx, 12
+    ja file_name_too_long
+    
+    mov	al, '$'	
 	stosb
 	pop	ax
 	ret
 read_filename_next:
 	lodsb	
 	stosb
+    inc cx
 	jmp read_filename_start
 
 read_filename ENDP
