@@ -399,7 +399,7 @@ write_row_data PROC near
     sub ax, rowStarts[bx]
     mov rowSize, ax
 
-    ; === Move file pointer to start ===
+    ; read first row to buffer
     mov ah, 42h
     mov al, 0
     xor cx, cx
@@ -410,67 +410,63 @@ write_row_data PROC near
 
     add dx, bx
 
-    push ax
+    mov bx, sourceFHandle
+    int 21h
 
-    mov ax, dx
-    call print_number
+    lea di, row1Buffer    
+    mov cx, rowSize
+    mov bx, sourceFHandle
+    mov ah, 3Fh
+    mov dx, di
+    int 21h
 
-    pop ax
+    mov bx, ax
+    mov row1Buffer[bx], '$'
+
+    ; get second rows size
+    mov bx, row2
+    dec bx 
+    shl bx, 1
+
+    mov ax, rowEnds[bx]
+    sub ax, rowStarts[bx]
+    mov rowSize, ax
+    
+    ; read row 2 to buffer
+    mov ah, 42h
+    mov al, 0
+    xor cx, cx
+    mov dx, rowStarts[bx]
+
+    mov bx, row2
+    sub bx, 1
+
+    add dx, bx
 
     mov bx, sourceFHandle
     int 21h
 
-    ; --- Read row into buffer ---
-    lea di, row1Buffer        ; DI = destination in memory
-    mov cx, rowSize           ; CX = number of bytes to read
+    lea di, row2Buffer    
+    mov cx, rowSize
     mov bx, sourceFHandle
     mov ah, 3Fh
     mov dx, di
-    int 21h                   ; read CX bytes into row1Buffer
+    int 21h
 
-    ; --- Append '$' for printing ---
-    mov bx, ax                ; AX = bytes actually read
-    mov row1Buffer[bx], '$'
+    mov bx, ax
+    mov row2Buffer[bx], '$'
 
-    ; --- Print it ---
     mov ax, @data
     mov ds, ax
     mov dx, offset row1Buffer
     mov ah, 09h
     int 21h
 
-    ; mov bx, row2
-    ; dec bx 
-    ; shl bx, 1
-    ; mov ax, rowEnds[bx]
-    ; sub ax, rowStarts[bx]
-    ; call print_number
-
-    ; get starting coordinates of rows to swap
-    ; mov bx, row1
-    ; dec bx 
-    ; shl bx, 1
-    ; mov ax, rowStarts[bx]
-    ; call print_number
-
-    ; mov bx, row2
-    ; dec bx 
-    ; shl bx, 1
-    ; mov ax, rowStarts[bx]
-    ; call print_number
-
-    ; mov dx, rowStarts[bx]   ; use the value, not offset
-    ; mov cx, 0              ; high word of file offset
-    ; mov ah, 42h
-    ; mov al, 0              ; from beginning of file
-    ; mov bx, sourceFHandle
-    ; int 21h
-
-    ; mov  ah, 40h
-    ; mov  bx, sourceFHandle
-    ; mov  cx, 2
-    ; mov  dx, offset data_to_write
-    ; int  21h
+    mov ax, @data
+    mov ds, ax
+    mov dx, offset row2Buffer
+    mov ah, 09h
+    int 21h
 
     swap_end:                 
         ret
