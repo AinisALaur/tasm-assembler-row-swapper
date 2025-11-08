@@ -177,8 +177,10 @@ handle_row_end:
     mov ax, currentPos
     add ax, 1
     mov rowStartPos, ax
-    inc currentRow
 
+    ; call print_data 
+
+    inc currentRow
     jmp read_loop
 
 err_source:
@@ -397,46 +399,45 @@ write_row_data PROC near
     sub ax, rowStarts[bx]
     mov rowSize, ax
 
-
-    ;printing a symbol to see if cursor works
     ; === Move file pointer to start ===
     mov ah, 42h
-    mov al, 0              ; from beginning
+    mov al, 0
     xor cx, cx
     mov dx, rowStarts[bx]
-    mov bx, sourceFHandle  ; BX = file handle
+
+    mov bx, row1
+    sub bx, 1
+
+    add dx, bx
+
+    push ax
+
+    mov ax, dx
+    call print_number
+
+    pop ax
+
+    mov bx, sourceFHandle
     int 21h
 
-    ; ; === Write symbol ===
-    mov ah, 40h
-    mov bx, sourceFHandle  ; BX must again = file handle
-    mov cx, 1              ; number of bytes to write
-    mov dx, offset symbol  ; address of symbol
+    ; --- Read row into buffer ---
+    lea di, row1Buffer        ; DI = destination in memory
+    mov cx, rowSize           ; CX = number of bytes to read
+    mov bx, sourceFHandle
+    mov ah, 3Fh
+    mov dx, di
+    int 21h                   ; read CX bytes into row1Buffer
+
+    ; --- Append '$' for printing ---
+    mov bx, ax                ; AX = bytes actually read
+    mov row1Buffer[bx], '$'
+
+    ; --- Print it ---
+    mov ax, @data
+    mov ds, ax
+    mov dx, offset row1Buffer
+    mov ah, 09h
     int 21h
-
-    ; row1_read_loop:
-    ;     mov	bx, sourceFHandle
-    ;     mov	dx, offset row1Buffer      
-    ;     mov	cx, 1  
-    ;     mov	ah, 3fh         
-    ;     int	21h	 
-
-    ;     dec rowSize
-    ;     jnz row1_read_loop
-
-    ; mov ax, rowEnds[bx]
-    ; sub ax, rowStarts[bx]
-    ; mov rowSize, ax
-    ; inc rowSize
-
-    ; mov bx, rowSize
-    ; mov row1Buffer[bx], '$'
-
-    ; mov	ax, @data          
-	; mov	ds, ax               
-	; mov	dx, offset row1Buffer       
-	; mov	ah, 09h              
-	; int	21h   
 
     ; mov bx, row2
     ; dec bx 
