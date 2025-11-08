@@ -38,7 +38,9 @@ sourceFHandle	dw ?
 
 rowSize dw ?
 
-symbol db '#', '$'
+empty_symbol db ' '
+
+currentIndex dw ?
 
 .code
 
@@ -410,6 +412,8 @@ write_row_data PROC near
 
     add dx, bx
 
+    mov currentIndex, dx
+
     mov bx, sourceFHandle
     int 21h
 
@@ -422,6 +426,30 @@ write_row_data PROC near
 
     mov bx, ax
     mov row1Buffer[bx], '$'
+
+    ;clear row1
+    clear_row1:
+        cmp rowSize, 0
+        jz stop_row1_clear
+
+        mov ah, 42h
+        mov al, 0
+        xor cx, cx
+        mov dx, currentIndex
+        mov bx, sourceFHandle
+        int 21h
+
+        mov ah, 40h
+        mov bx, sourceFHandle
+        mov cx, 1
+        mov dx, offset empty_symbol
+        int 21h
+
+        inc currentIndex
+        dec rowSize
+        jmp clear_row1
+
+    stop_row1_clear:
 
     ; get second rows size
     mov bx, row2
@@ -442,6 +470,7 @@ write_row_data PROC near
     sub bx, 1
 
     add dx, bx
+    mov currentIndex, dx
 
     mov bx, sourceFHandle
     int 21h
@@ -456,16 +485,79 @@ write_row_data PROC near
     mov bx, ax
     mov row2Buffer[bx], '$'
 
-    mov ax, @data
-    mov ds, ax
-    mov dx, offset row1Buffer
-    mov ah, 09h
+    clear_row2:
+        cmp rowSize, 0
+        jz stop_row2_clear
+
+        mov ah, 42h
+        mov al, 0
+        xor cx, cx
+        mov dx, currentIndex
+        mov bx, sourceFHandle
+        int 21h
+
+        mov ah, 40h
+        mov bx, sourceFHandle
+        mov cx, 1
+        mov dx, offset empty_symbol
+        int 21h
+
+        inc currentIndex
+        dec rowSize
+        jmp clear_row2
+
+    stop_row2_clear:
+
+    ;write row1 instead of row2
+    mov bx, row2
+    dec bx 
+    shl bx, 1
+
+    mov ax, rowEnds[bx]
+    sub ax, rowStarts[bx]
+    mov rowSize, ax
+
+
+    mov ah, 42h
+    mov al, 0
+    xor cx, cx
+    mov dx, rowStarts[bx]
+    mov bx, row2
+    sub bx, 1
+    add dx, bx
+    mov bx, sourceFHandle
     int 21h
 
-    mov ax, @data
-    mov ds, ax
+    mov ah, 40h
+    mov bx, sourceFHandle
+    mov cx, rowSize
+    mov dx, offset row1Buffer
+    int 21h
+
+    ;write row2 instead of row1
+    mov bx, row1
+    dec bx 
+    shl bx, 1
+
+    mov ax, rowEnds[bx]
+    sub ax, rowStarts[bx]
+    mov rowSize, ax
+
+
+    mov ah, 42h
+    mov al, 0
+    xor cx, cx
+    mov dx, rowStarts[bx]
+    mov bx, row1
+    sub bx, 1
+    add dx, bx
+    mov bx, sourceFHandle
+    int 21h
+
+    mov ah, 40h
+    mov bx, sourceFHandle
+    mov cx, rowSize
     mov dx, offset row2Buffer
-    mov ah, 09h
     int 21h
 
     swap_end:                 
