@@ -36,6 +36,10 @@ row2Buffer db 256 dup(0)
 sourceF   	db 12 dup (0) 
 sourceFHandle	dw ? 
 
+rowSize dw ?
+
+symbol db '#', '$'
+
 .code
 
 START:
@@ -117,7 +121,7 @@ source_from_file:
 
 	mov	dx, offset sourceF
 	mov	ah, 3dh            
-	mov	al, 0             
+	mov	al, 2            
 	int	21h		
 	jc	err_source	
 	mov	sourceFHandle, ax	
@@ -142,9 +146,6 @@ read_loop:
 	jmp	read_loop	   
 
 close_file:
-    mov ax, currentRow
-    call print_number
-
     mov bx, currentRow 
     shl bx, 1
 
@@ -173,16 +174,10 @@ handle_row_end:
     mov ax, currentPos
     mov rowEnds[bx], ax
 
-    ;;;;;;;;;;;
-    mov ax, currentRow
-    call print_number
-
     mov ax, currentPos
     add ax, 1
     mov rowStartPos, ax
     inc currentRow
-
-    ; call print_data
 
     jmp read_loop
 
@@ -379,10 +374,10 @@ write_row_data PROC near
     dec bx
 
     cmp ax, 0
-    jbe err_out_bounds
+    jb err_out_bounds
 
     cmp bx, 0
-    jbe err_out_bounds
+    jb err_out_bounds
 
     cmp ax, currentRow
     ja err_out_bounds
@@ -393,13 +388,55 @@ write_row_data PROC near
     cmp ax, bx
     je swap_end
 
-    ;Prints number of symbols in a line
-    ; mov bx, row1
-    ; dec bx 
-    ; shl bx, 1
+    ; gets first rows1 size
+    mov bx, row1
+    dec bx 
+    shl bx, 1
+
+    mov ax, rowEnds[bx]
+    sub ax, rowStarts[bx]
+    mov rowSize, ax
+
+
+    ;printing a symbol to see if cursor works
+    ; === Move file pointer to start ===
+    mov ah, 42h
+    mov al, 0              ; from beginning
+    xor cx, cx
+    mov dx, rowStarts[bx]
+    mov bx, sourceFHandle  ; BX = file handle
+    int 21h
+
+    ; ; === Write symbol ===
+    mov ah, 40h
+    mov bx, sourceFHandle  ; BX must again = file handle
+    mov cx, 1              ; number of bytes to write
+    mov dx, offset symbol  ; address of symbol
+    int 21h
+
+    ; row1_read_loop:
+    ;     mov	bx, sourceFHandle
+    ;     mov	dx, offset row1Buffer      
+    ;     mov	cx, 1  
+    ;     mov	ah, 3fh         
+    ;     int	21h	 
+
+    ;     dec rowSize
+    ;     jnz row1_read_loop
+
     ; mov ax, rowEnds[bx]
     ; sub ax, rowStarts[bx]
-    ; call print_number
+    ; mov rowSize, ax
+    ; inc rowSize
+
+    ; mov bx, rowSize
+    ; mov row1Buffer[bx], '$'
+
+    ; mov	ax, @data          
+	; mov	ds, ax               
+	; mov	dx, offset row1Buffer       
+	; mov	ah, 09h              
+	; int	21h   
 
     ; mov bx, row2
     ; dec bx 
