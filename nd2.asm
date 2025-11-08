@@ -142,6 +142,9 @@ read_loop:
 	jmp	read_loop	   
 
 close_file:
+    mov ax, currentRow
+    call print_number
+
     mov bx, currentRow 
     shl bx, 1
 
@@ -170,10 +173,14 @@ handle_row_end:
     mov ax, currentPos
     mov rowEnds[bx], ax
 
-    inc currentRow
+    ;;;;;;;;;;;
+    mov ax, currentRow
+    call print_number
+
     mov ax, currentPos
     add ax, 1
     mov rowStartPos, ax
+    inc currentRow
 
     ; call print_data
 
@@ -368,6 +375,9 @@ write_row_data PROC near
     mov ax, row1
     mov bx, row2
 
+    dec ax
+    dec bx
+
     cmp ax, 0
     jbe err_out_bounds
 
@@ -382,6 +392,21 @@ write_row_data PROC near
 
     cmp ax, bx
     je swap_end
+
+    ;Prints number of symbols in a line
+    ; mov bx, row1
+    ; dec bx 
+    ; shl bx, 1
+    ; mov ax, rowEnds[bx]
+    ; sub ax, rowStarts[bx]
+    ; call print_number
+
+    ; mov bx, row2
+    ; dec bx 
+    ; shl bx, 1
+    ; mov ax, rowEnds[bx]
+    ; sub ax, rowStarts[bx]
+    ; call print_number
 
     ; get starting coordinates of rows to swap
     ; mov bx, row1
