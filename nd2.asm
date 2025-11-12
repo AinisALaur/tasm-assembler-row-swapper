@@ -38,7 +38,7 @@ sourceFHandle	dw ?
 
 rowSize dw ?
 
-clear_symbol db ' '
+clear_symbol db 0
 
 currentIndex dw ?
 
@@ -48,6 +48,8 @@ rowSize2 dw ?
 remaining_symbols dw ?
 
 marker db 'X'
+
+CRLF db 0Dh, 0Ah
 
 .code
 
@@ -160,12 +162,6 @@ close_file:
 	jmp	readSourceFile	
 
 handle_row_end:
-    ; mov ah, 40h
-    ; mov bx, sourceFHandle
-    ; mov cx, 1
-    ; mov dx, offset marker
-    ; int 21h
-
     mov bx, currentRow 
     shl bx, 1
     
@@ -423,8 +419,6 @@ write_row_data PROC near
     mov dx, di
     int 21h
 
-    mov bx, rowSize
-
     ; get second rows size
     mov bx, row2
     dec bx 
@@ -473,105 +467,159 @@ write_row_data PROC near
     sub ax, rowStarts[bx]
     mov rowSize2, ax
 
-    ; Compare row sizes
     mov ax, rowSize1
     mov cx, rowSize2
     cmp ax, cx
-    ja  pad_row2         ; row1 longer -> pad row2
-    jb  pad_row1         ; row2 longer -> pad row1
-    jmp done_padding
+    jae row1_longer_swap
+    jb row2_longer_swap
 
-    ; -------------------------------------------------------
-    pad_row2:             ; pad row2Buffer with spaces
-        mov ax, rowSize2
-        mov si, ax        ; SI = start offset for padding
-        mov cx, rowSize1
-        sub cx, rowSize2  ; CX = how many spaces to add
-    pad_row2_loop:
-        cmp cx, 0
-        jz pad_row2_done
-        mov byte ptr row2Buffer[si], ' '
-        inc si
-        dec cx
-        jmp pad_row2_loop
-    pad_row2_done:
-        mov rowSize2, si  ; update new total size
-        jmp done_padding
+    row1_longer_swap:
+        mov bx, row1
+        dec bx 
+        shl bx, 1
 
-    ; -------------------------------------------------------
-    pad_row1:             ; pad row1Buffer with spaces
-        mov ax, rowSize1
-        mov si, ax
+        mov ah, 42h
+        mov al, 0
+        xor cx, cx
+        mov dx, rowStarts[bx]
+        mov bx, row1
+        sub bx, 1
+        add dx, bx
+        mov bx, sourceFHandle
+        int 21h
+
+        mov ah, 40h
+        mov bx, sourceFHandle
         mov cx, rowSize2
-        sub cx, rowSize1
-    pad_row1_loop:
-        cmp cx, 0
-        jz pad_row1_done
-        mov byte ptr row1Buffer[si], ' '
-        inc si
-        dec cx
-        jmp pad_row1_loop
-    pad_row1_done:
-        mov rowSize1, si
-        jmp done_padding
+        mov dx, offset row2Buffer
+        int 21h
 
-    ; -------------------------------------------------------
-    done_padding:
-        ; Append CRLF to both rows
-        mov bx, rowSize1
-        mov byte ptr row1Buffer[bx], 0Dh
-        inc bx
-        mov byte ptr row1Buffer[bx], 0Ah
-        inc bx
-        mov rowSize1, bx
+        mov ax, rowSize1
+        sub ax, rowSize2
+        mov remaining_symbols, ax
+        mov ax, remaining_symbols
+        
+        wipe_characters_row1:
+            cmp remaining_symbols, 0
+            je finish_wiping_row1
+            mov ah, 40h
+            mov bx, sourceFHandle
+            mov cx, 1
+            mov dx, offset clear_symbol
+            int 21h
+            dec remaining_symbols
+            jmp wipe_characters_row1
 
-        mov bx, rowSize2
-        mov byte ptr row2Buffer[bx], 0Dh
-        inc bx
-        mov byte ptr row2Buffer[bx], 0Ah
-        inc bx
-        mov rowSize2, bx
+        finish_wiping_row1:
 
-    mov bx, row1
-    dec bx 
-    shl bx, 1
+        mov ah, 40h
+        mov bx, sourceFHandle
+        mov cx, 2
+        mov dx, offset CRLF
+        int 21h
 
-    mov ah, 42h
-    mov al, 0
-    xor cx, cx
-    mov dx, rowStarts[bx]
-    mov bx, row1
-    sub bx, 1
-    add dx, bx ; could be that it moves to the wrong position
-    mov bx, sourceFHandle
-    int 21h
+        ;;;;;;;;;;;;;;;;;;;;;;;;;;
+        mov bx, row2
+        dec bx 
+        shl bx, 1
 
-    mov ah, 40h
-    mov bx, sourceFHandle
-    mov cx, rowSize2
-    mov dx, offset row2Buffer
-    int 21h
-    
-    ;;;;;;;;;;;;;;;;;;;;;;;;;;
-    mov bx, row2
-    dec bx 
-    shl bx, 1
+        mov ah, 42h
+        mov al, 0
+        xor cx, cx
+        mov dx, rowStarts[bx]
+        mov bx, row2
+        sub bx, 1
+        add dx, bx
+        mov bx, sourceFHandle
+        int 21h
 
-    mov ah, 42h
-    mov al, 0
-    xor cx, cx
-    mov dx, rowStarts[bx]
-    mov bx, row2
-    sub bx, 1
-    add dx, bx ; could be that it moves to the wrong position
-    mov bx, sourceFHandle
-    int 21h
+        mov ah, 40h
+        mov bx, sourceFHandle
+        mov cx, rowSize1
+        mov dx, offset row1Buffer
+        int 21h
 
-    mov ah, 40h
-    mov bx, sourceFHandle
-    mov cx, rowSize1
-    mov dx, offset row1Buffer
-    int 21h
+        mov ah, 40h
+        mov bx, sourceFHandle
+        mov cx, 2
+        mov dx, offset CRLF
+        int 21h
+
+        jmp swap_end
+
+    row2_longer_swap:
+        mov bx, row2
+        dec bx 
+        shl bx, 1
+
+        mov ah, 42h
+        mov al, 0
+        xor cx, cx
+        mov dx, rowStarts[bx]
+        mov bx, row2
+        sub bx, 1
+        add dx, bx
+        mov bx, sourceFHandle
+        int 21h
+
+        mov ah, 40h
+        mov bx, sourceFHandle
+        mov cx, rowSize1
+        mov dx, offset row1Buffer
+        int 21h
+
+        mov ax, rowSize2
+        sub ax, rowSize1
+        mov remaining_symbols, ax
+        mov ax, remaining_symbols
+        
+        wipe_characters_row2:
+            cmp remaining_symbols, 0
+            je finish_wiping_row2
+            mov ah, 40h
+            mov bx, sourceFHandle
+            mov cx, 1
+            mov dx, offset clear_symbol
+            int 21h
+            dec remaining_symbols
+            jmp wipe_characters_row2
+
+        finish_wiping_row2:
+
+        mov ah, 40h
+        mov bx, sourceFHandle
+        mov cx, 2
+        mov dx, offset CRLF
+        int 21h
+
+        ;;;;;;;;;;;;;;;;;;;;;;;;;;
+        mov bx, row1
+        dec bx 
+        shl bx, 1
+
+        mov ah, 42h
+        mov al, 0
+        xor cx, cx
+        mov dx, rowStarts[bx]
+        mov bx, row1
+        sub bx, 1
+        add dx, bx
+        mov bx, sourceFHandle
+        int 21h
+
+        mov ah, 40h
+        mov bx, sourceFHandle
+        mov cx, rowSize2
+        mov dx, offset row2Buffer
+        int 21h
+
+        mov ah, 40h
+        mov bx, sourceFHandle
+        mov cx, 2
+        mov dx, offset CRLF
+        int 21h
+
+        jmp swap_end
 
     swap_end:                 
         ret
