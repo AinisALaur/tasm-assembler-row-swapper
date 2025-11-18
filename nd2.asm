@@ -1,12 +1,12 @@
 ; Programa: Nr. 2
 
-; Programa, kurios pirmas ir antras parametrai - eilutės (numeriai eilučių), 
+; Programa, kurios pirmas ir antras parametrai - eilutės,
 ; visi kiti - failų vardai. Visuose failuose pirma įvesta eilutė pakeičiama antrąja.
-
 ; Atliko: Ainis Laurinavičius id: 2412598
 
 .model small
 .stack 100H
+
 JUMPS
 
 .data
@@ -24,14 +24,13 @@ err_fileName db 'Source failo vardas per ilgas', 13, 10, '$'
 
 buffer  	db 1 dup (?)
 
-rowStarts   dw 100 dup(0)
-rowEnds  dw 100 dup(0)
+rowStarts   dw 500 dup(0)
+rowEnds  dw 500 dup(0)
 currentPos dw 0
 currentRow dw 0
 rowStartPos dw 0
 
-row1Buffer db 256 dup(0)
-row2Buffer db 256 dup(0)
+rowChar db 1 dup(0)
 
 sourceF   	db 12 dup (0) 
 sourceFHandle	dw ? 
@@ -42,14 +41,12 @@ clear_symbol db 0
 
 currentIndex dw ?
 
-rowSize1 dw ?
-rowSize2 dw ?
+outputFileName db "rez.txt", 0
+outputHandle dw ? 
 
-remaining_symbols dw ?
+writeRow  dw 0
 
-marker db 'X'
-
-CRLF db 0Dh, 0Ah
+newline db 13,10
 
 .code
 
@@ -162,6 +159,11 @@ close_file:
 	jmp	readSourceFile	
 
 handle_row_end:
+    mov ax, currentRow
+    inc ax
+    mov bx, row1
+    cmp ax, bx
+
     mov bx, currentRow 
     shl bx, 1
     
@@ -387,241 +389,77 @@ write_row_data PROC near
     cmp ax, bx
     je swap_end
 
-    ; gets first rows1 size
-    mov bx, row1
-    dec bx 
-    shl bx, 1
-
-    mov ax, rowEnds[bx]
-    sub ax, rowStarts[bx]
-    mov rowSize, ax
-
-    ; read first row to buffer
-    mov ah, 42h
-    mov al, 0
-    xor cx, cx
-    mov dx, rowStarts[bx]
-
-    mov bx, row1
-    sub bx, 1
-
-    add dx, bx
-
-    mov currentIndex, dx
-
-    mov bx, sourceFHandle
+    mov ah, 3Ch
+    mov cx, 0
+    mov dx, offset outputFileName
     int 21h
+    jc  help
+    mov bx, ax 
 
-    lea di, row1Buffer    
-    mov cx, rowSize
-    mov bx, sourceFHandle
-    mov ah, 3Fh
-    mov dx, di
-    int 21h
-
-    ; get second rows size
-    mov bx, row2
-    dec bx 
-    shl bx, 1
-
-    mov ax, rowEnds[bx]
-    sub ax, rowStarts[bx]
-    mov rowSize, ax
+    ;;writing to new file logic
     
-    ; ; read row 2 to buffer
+    mov ah, 3Ch
+    mov cx, 0
+    mov dx, offset outputFileName
+    int 21h
+    jc  help
+    mov outputHandle, ax
+
     mov ah, 42h
     mov al, 0
     xor cx, cx
-    mov dx, rowStarts[bx]
-
-    mov bx, row2
-    sub bx, 1
-
-    add dx, bx
-    mov currentIndex, dx
-
+    mov dx, 0
     mov bx, sourceFHandle
     int 21h
 
-    lea di, row2Buffer    
-    mov cx, rowSize
-    mov bx, sourceFHandle
-    mov ah, 3Fh
-    mov dx, di
-    int 21h
+    mov writeRow, 0
 
-    ;row writing logic
-    mov bx, row1
-    dec bx 
-    shl bx, 1
-
-    mov ax, rowEnds[bx]
-    sub ax, rowStarts[bx]
-    mov rowSize1, ax
-
-    mov bx, row2
-    dec bx 
-    shl bx, 1
-
-    mov ax, rowEnds[bx]
-    sub ax, rowStarts[bx]
-    mov rowSize2, ax
-
-    mov ax, rowSize1
-    mov cx, rowSize2
-    cmp ax, cx
-    jae row1_longer_swap
-    jb row2_longer_swap
-
-    row1_longer_swap:
-        mov bx, row1
-        dec bx 
-        shl bx, 1
-
-        mov ah, 42h
-        mov al, 0
-        xor cx, cx
-        mov dx, rowStarts[bx]
-        mov bx, row1
-        sub bx, 1
-        add dx, bx
-        mov bx, sourceFHandle
-        int 21h
-
-        mov ah, 40h
-        mov bx, sourceFHandle
-        mov cx, rowSize2
-        mov dx, offset row2Buffer
-        int 21h
-
-        mov ax, rowSize1
-        sub ax, rowSize2
-        mov remaining_symbols, ax
-        mov ax, remaining_symbols
-        
-        wipe_characters_row1:
-            cmp remaining_symbols, 0
-            je finish_wiping_row1
-            mov ah, 40h
+    write_loop:
+        mov ax, currentRow
+        call print_number
+        write_row:
+            mov ah, 3Fh
             mov bx, sourceFHandle
             mov cx, 1
-            mov dx, offset clear_symbol
+            mov dx, offset rowChar
             int 21h
-            dec remaining_symbols
-            jmp wipe_characters_row1
+            jc help
 
-        finish_wiping_row1:
+            cmp rowChar, 13
+            je write_new_line
 
-        mov ah, 40h
-        mov bx, sourceFHandle
-        mov cx, 2
-        mov dx, offset CRLF
-        int 21h
-
-        ;;;;;;;;;;;;;;;;;;;;;;;;;;
-        mov bx, row2
-        dec bx 
-        shl bx, 1
-
-        mov ah, 42h
-        mov al, 0
-        xor cx, cx
-        mov dx, rowStarts[bx]
-        mov bx, row2
-        sub bx, 1
-        add dx, bx
-        mov bx, sourceFHandle
-        int 21h
-
-        mov ah, 40h
-        mov bx, sourceFHandle
-        mov cx, rowSize1
-        mov dx, offset row1Buffer
-        int 21h
-
-        mov ah, 40h
-        mov bx, sourceFHandle
-        mov cx, 2
-        mov dx, offset CRLF
-        int 21h
-
-        jmp swap_end
-
-    row2_longer_swap:
-        mov bx, row2
-        dec bx 
-        shl bx, 1
-
-        mov ah, 42h
-        mov al, 0
-        xor cx, cx
-        mov dx, rowStarts[bx]
-        mov bx, row2
-        sub bx, 1
-        add dx, bx
-        mov bx, sourceFHandle
-        int 21h
-
-        mov ah, 40h
-        mov bx, sourceFHandle
-        mov cx, rowSize1
-        mov dx, offset row1Buffer
-        int 21h
-
-        mov ax, rowSize2
-        sub ax, rowSize1
-        mov remaining_symbols, ax
-        mov ax, remaining_symbols
-        
-        wipe_characters_row2:
-            cmp remaining_symbols, 0
-            je finish_wiping_row2
+            mov cx, ax 
             mov ah, 40h
-            mov bx, sourceFHandle
-            mov cx, 1
-            mov dx, offset clear_symbol
+            mov bx, outputHandle
+            mov dx, offset rowChar
             int 21h
-            dec remaining_symbols
-            jmp wipe_characters_row2
 
-        finish_wiping_row2:
+            cmp ax, 0
+            je finish
+            
+            jmp write_row
 
-        mov ah, 40h
-        mov bx, sourceFHandle
-        mov cx, 2
-        mov dx, offset CRLF
-        int 21h
+        write_new_line:
+            mov ah, 40h
+            mov bx, outputHandle
+            mov cx, 2
+            mov dx, offset newline
+            int 21h
 
-        ;;;;;;;;;;;;;;;;;;;;;;;;;;
-        mov bx, row1
-        dec bx 
-        shl bx, 1
+            inc writeRow
+            dec currentRow
 
-        mov ah, 42h
-        mov al, 0
-        xor cx, cx
-        mov dx, rowStarts[bx]
-        mov bx, row1
-        sub bx, 1
-        add dx, bx
-        mov bx, sourceFHandle
-        int 21h
+            cmp currentRow, 0
+            jb finish
 
-        mov ah, 40h
-        mov bx, sourceFHandle
-        mov cx, rowSize2
-        mov dx, offset row2Buffer
-        int 21h
+            jmp write_loop
 
-        mov ah, 40h
-        mov bx, sourceFHandle
-        mov cx, 2
-        mov dx, offset CRLF
-        int 21h
+    finish:
+        mov ah, 3Eh
+        mov bx, outputHandle
+        int 21h   
 
-        jmp swap_end
-
-    swap_end:                 
+    swap_end:            
         ret
 write_row_data ENDP
 
