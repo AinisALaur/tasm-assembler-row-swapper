@@ -21,11 +21,11 @@ startRow    db 'Row start',13,10,'$'
 endRow      db 'Row end',13,10,'$'
 new_line    db 13,10,13,10,'$'
 err_fileName db 'Source failo vardas per ilgas', 13, 10, '$'
+no_source_file db 'Privalote irasyti, bent viena source failo pavadinima', 13, 10, '$'
 
 buffer  	db 1 dup (?)
 
 rowStarts   dw 500 dup(0)
-rowEnds  dw 500 dup(0)
 currentPos dw 0
 currentRow dw 0
 rowStartPos dw 0
@@ -34,12 +34,6 @@ rowChar db 1 dup(0)
 
 sourceF   	db 12 dup (0) 
 sourceFHandle	dw ? 
-
-rowSize dw ?
-
-clear_symbol db 0
-
-currentIndex dw ?
 
 fileCounter dw 1
 outputFileName db 20 dup(0)
@@ -80,6 +74,9 @@ START:
 
 	lea	di, sourceF
 	call	read_filename
+
+    cmp	byte ptr es:[sourceF], '$'
+    je	no_first_sourceFile
 
 	push	ds si
 
@@ -131,7 +128,6 @@ read_loop:
 	cmp	ax, 0         
 	je	close_file         
 
-    ; print the character
     mov dl, byte ptr [buffer]
     cmp dl, 13
     je handle_row_end
@@ -146,9 +142,6 @@ close_file:
 
     mov ax, rowStartPos
     mov rowStarts[bx], ax
-
-    mov ax, currentPos
-    mov rowEnds[bx], ax
 
     ; call print_data
     call write_row_data
@@ -170,9 +163,6 @@ handle_row_end:
     
     mov ax, rowStartPos
     mov rowStarts[bx], ax
-
-    mov ax, currentPos
-    mov rowEnds[bx], ax
 
     mov ax, currentPos
     add ax, 1
@@ -227,6 +217,14 @@ err_out_bounds:
     mov	ax, @data          
 	mov	ds, ax               
 	mov	dx, offset err_bounds       
+	mov	ah, 09h              
+	int	21h                   
+	jmp _end 
+
+no_first_sourceFile: 
+    mov	ax, @data          
+	mov	ds, ax               
+	mov	dx, offset no_source_file       
 	mov	ah, 09h              
 	int	21h                   
 	jmp _end  
@@ -355,9 +353,6 @@ print_data PROC near
 	mov	ah, 09h              
 	int	21h  
 
-    mov ax, rowEnds[bx]
-    call print_number
-
     mov	ax, @data          
 	mov	ds, ax               
 	mov	dx, offset new_line       
@@ -368,7 +363,6 @@ print_data PROC near
 print_data ENDP
 
 write_row_data PROC near
-    ;if equal no swapping
     mov ax, row1
     mov bx, row2
 
@@ -390,7 +384,6 @@ write_row_data PROC near
     ;;writing to new file logic
     call generate_filename
 
-    ; Create output file
     mov ah, 3Ch
     mov cx, 0
     mov dx, offset outputFileName
@@ -507,29 +500,20 @@ write_row_data PROC near
         ret
 write_row_data ENDP
 
-weird:
-    mov ax, writeRow
-    call print_number
-    jmp finish
-
-
 generate_filename PROC near
     push ax
     push bx
     push cx
     push di
     
-    ; Reset filename to "rez"
     lea di, outputFileName
     mov byte ptr [di], 'r'
     mov byte ptr [di+1], 'e'
     mov byte ptr [di+2], 'z'
     
-    ; Get file counter and convert to string
     mov ax, fileCounter
-    inc fileCounter  ; Increment for next file
+    inc fileCounter
     
-    ; Convert number to ASCII (supports 1-999)
     mov bx, 10
     xor cx, cx
     
@@ -541,8 +525,7 @@ convert_num:
     cmp ax, 0
     jne convert_num
     
-    ; Write digits to filename
-    add di, 3  ; Position after "rez"
+    add di, 3
     
 write_digits:
     pop dx
@@ -551,7 +534,6 @@ write_digits:
     inc di
     loop write_digits
     
-    ; Add ".txt" extension
     mov byte ptr [di], '.'
     mov byte ptr [di+1], 't'
     mov byte ptr [di+2], 'x'
