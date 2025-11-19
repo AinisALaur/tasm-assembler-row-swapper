@@ -387,9 +387,6 @@ write_row_data PROC near
     cmp bx, currentRow
     ja err_out_bounds
 
-    cmp ax, bx
-    je swap_end
-
     ;;writing to new file logic
     call generate_filename
 
