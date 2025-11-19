@@ -398,16 +398,13 @@ write_row_data PROC near
     mov cx, 0
     mov dx, offset outputFileName
     int 21h
-    jc help
+    jc finish
     mov outputHandle, ax
 
     mov writeRow, 0
 
     write_loop:
         mov ax, writeRow
-        cmp ax, currentRow
-        ja finish
-
         inc ax
 
         cmp ax, row1
@@ -422,6 +419,7 @@ write_row_data PROC near
             mov bx, row1
             dec bx
             add bx, bx
+
             mov ah, 42h
             mov al, 0
             xor cx, cx
@@ -431,12 +429,14 @@ write_row_data PROC near
             add dx, bx
             mov bx, sourceFHandle
             int 21h
+
             jmp write_row
 
         move_cursor_row2:
             mov bx, row2
             dec bx
             add bx, bx
+
             mov ah, 42h
             mov al, 0
             xor cx, cx
@@ -446,11 +446,13 @@ write_row_data PROC near
             add dx, bx
             mov bx, sourceFHandle
             int 21h
+
             jmp write_row
         
         move_cursor_default:
             mov bx, writeRow
             add bx, bx
+
             mov ah, 42h
             mov al, 0
             xor cx, cx
@@ -459,6 +461,7 @@ write_row_data PROC near
             add dx, bx
             mov bx, sourceFHandle
             int 21h
+
             jmp write_row
 
         write_row:
@@ -467,7 +470,7 @@ write_row_data PROC near
             mov cx, 1
             mov dx, offset rowChar
             int 21h
-            jc help
+            jc finish
 
             cmp rowChar, 13
             je write_new_line
@@ -479,18 +482,23 @@ write_row_data PROC near
             int 21h
 
             cmp ax, 0
-            je finish
+            je write_new_line
             
             jmp write_row
 
         write_new_line:
+            inc writeRow
+
+            mov ax, writeRow
+            cmp ax, currentRow
+            ja finish
+
             mov ah, 40h
             mov bx, outputHandle
             mov cx, 2
             mov dx, offset newline
             int 21h
-
-            inc writeRow
+            
             jmp write_loop
 
     finish:
@@ -501,6 +509,12 @@ write_row_data PROC near
     swap_end:            
         ret
 write_row_data ENDP
+
+weird:
+    mov ax, writeRow
+    call print_number
+    jmp finish
+
 
 generate_filename PROC near
     push ax
