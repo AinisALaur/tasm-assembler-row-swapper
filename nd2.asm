@@ -41,7 +41,8 @@ clear_symbol db 0
 
 currentIndex dw ?
 
-outputFileName db "rez.txt", 0
+fileCounter dw 1
+outputFileName db 20 dup(0)
 outputHandle dw ? 
 
 writeRow  dw 0
@@ -390,11 +391,14 @@ write_row_data PROC near
     je swap_end
 
     ;;writing to new file logic
+    call generate_filename
+
+    ; Create output file
     mov ah, 3Ch
     mov cx, 0
     mov dx, offset outputFileName
     int 21h
-    jc  help
+    jc help
     mov outputHandle, ax
 
     mov writeRow, 0
@@ -404,9 +408,7 @@ write_row_data PROC near
         cmp ax, currentRow
         ja finish
 
-
         inc ax
-
 
         cmp ax, row1
         je move_cursor_row2
@@ -499,5 +501,57 @@ write_row_data PROC near
     swap_end:            
         ret
 write_row_data ENDP
+
+generate_filename PROC near
+    push ax
+    push bx
+    push cx
+    push di
+    
+    ; Reset filename to "rez"
+    lea di, outputFileName
+    mov byte ptr [di], 'r'
+    mov byte ptr [di+1], 'e'
+    mov byte ptr [di+2], 'z'
+    
+    ; Get file counter and convert to string
+    mov ax, fileCounter
+    inc fileCounter  ; Increment for next file
+    
+    ; Convert number to ASCII (supports 1-999)
+    mov bx, 10
+    xor cx, cx
+    
+convert_num:
+    xor dx, dx
+    div bx
+    push dx
+    inc cx
+    cmp ax, 0
+    jne convert_num
+    
+    ; Write digits to filename
+    add di, 3  ; Position after "rez"
+    
+write_digits:
+    pop dx
+    add dl, '0'
+    mov byte ptr [di], dl
+    inc di
+    loop write_digits
+    
+    ; Add ".txt" extension
+    mov byte ptr [di], '.'
+    mov byte ptr [di+1], 't'
+    mov byte ptr [di+2], 'x'
+    mov byte ptr [di+3], 't'
+    mov byte ptr [di+4], 0
+    
+    pop di
+    pop cx
+    pop bx
+    pop ax
+    ret
+generate_filename ENDP
 
 end START
