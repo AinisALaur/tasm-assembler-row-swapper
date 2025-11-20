@@ -30,9 +30,9 @@ currentPos dw 0
 currentRow dw 0
 rowStartPos dw 0
 
-rowChar db 1 dup(0)
+rowBuffer db 10 dup(0)
 
-sourceF   	db 12 dup (0) 
+sourceF   	db 13 dup (0) 
 sourceFHandle	dw ? 
 
 fileCounter dw 1
@@ -457,24 +457,41 @@ write_row_data PROC near
         write_row:
             mov ah, 3Fh
             mov bx, sourceFHandle
-            mov cx, 1
-            mov dx, offset rowChar
+            mov cx, 10
+            mov dx, offset rowBuffer
             int 21h
             jc finish
 
-            cmp rowChar, 13
-            je write_new_line
-
-            mov cx, ax 
-            mov ah, 40h
-            mov bx, outputHandle
-            mov dx, offset rowChar
-            int 21h
-
             cmp ax, 0
-            je write_new_line
+            je finish
+
+            mov si, offset rowBuffer
+            mov cx, ax  
+
+            check_buffer_loop:
+                cmp     cx, 0
+                je      write_row
+
+                mov     al, [si]
+
+                cmp     al, 13
+                je      write_new_line
+
+                push cx
+
+                mov     ah, 40h
+                mov     bx, outputHandle
+                mov     dx, si
+                mov     cx, 1 
+                int     21h
+
+                pop cx
+
+            next_char:
+                inc     si
+                dec     cx
+                jmp     check_buffer_loop
             
-            jmp write_row
 
         write_new_line:
             inc writeRow
